@@ -8,7 +8,9 @@ import (
 	"time"
 	"strings"
 	"regexp"
+	"strconv"
 	"github.com/jmhodges/levigo"
+	"encoding/json"
 )
 
 func main() {
@@ -40,18 +42,14 @@ func main() {
 	done := make(chan bool)
 
 	count := 0
-	// Doing Paraller Crawling here
-	// Range denotes the number of concurrent executions of crawling
-	// Higher range would result in faster execution 1048576
-	for i := 0; i < 1048576; i++ {
+
+	for i := 0; i < 1; i++ {
 		// Running an async Go function
 		go func() {
 			for uri := range filteredQueue {
 				enqueue(uri, queue)
 				count++
-				if count == 1 || count == 10 || count == 100 || count == 1000 || count == 10000 || count == 100000 || count == 200000 || count == 500000 || count == 1000000 {
-					fmt.Println("Varun Amigo Wiki Crawler:      ", count, "web pages crawled in", time.Since(tStart))
-				}
+				fmt.Println("Varun Amigo Wiki Crawler:      ", count, "web pages crawled in", time.Since(tStart))
 			}
 			// Signalling the end of execution for current url
 			done <- true
@@ -77,7 +75,7 @@ func filterQueue(in chan string, out chan string) {
 // 1. Find all the links in the web page and add them in the queue
 // 2. Store the web page text corresponding to the url 
 func enqueue(uri string, queue chan string) {
-	fmt.Println("Fetching", uri)
+	fmt.Println("Crawling", uri)
 
 	// A colly which only crawls through Wikipedia Pages
 	collyCollector := colly.NewCollector(
@@ -100,42 +98,53 @@ func enqueue(uri string, queue chan string) {
 		}
 
 		text := e.Text
-
-		// Open the db
-		opts := levigo.NewOptions()
-		opts.SetCache(levigo.NewLRUCache(3<<30))
-		opts.SetCreateIfMissing(true)
-		db, _ := levigo.Open("db", opts)
-
-		// Writing to the db (Key -> url, Value -> Text of Webpage)
-		wo := levigo.NewWriteOptions()
-		_ = db.Put(wo, []byte(uri), []byte(text))
-
-		defer wo.Close()
-		defer db.Close()
-
-		// Reading from the db
-		// ro := levigo.NewReadOptions()
-		// data, _ := db.Get(ro, []byte(uri))
-		// fmt.Println("Data is:", string(data))
-
-		// Deleting from db
-		// wo := levigo.NewWriteOptions()
-		// _ = db.Delete(wo, []byte("anotherkey"))
-
-		// counts := wordCount(text)
-		// for word, freq := range counts{
-		// 	fmt.Println(word, "=>", freq)
-		// }
-		// fmt.Println(len(counts))
-
+		storeData(uri, text)
+		
     })
 
     collyCollector.Visit(uri)
 
 }
 
-// Calculates frequency of every word in string (Not currently in use)
+func storeData(uri, text string) {
+	// Open the db
+	opts := levigo.NewOptions()
+	opts.SetCache(levigo.NewLRUCache(3<<30))
+	opts.SetCreateIfMissing(true)
+	db, _ := levigo.Open("dictionary", opts)
+
+
+	// Reading from the db
+	ro := levigo.NewReadOptions()
+	// Writing to the db (Key -> keyword, Value -> url)
+	wo := levigo.NewWriteOptions()
+
+	counts := wordCount(text)
+	for word, freq := range counts{
+		fmt.Println(word, "=>", freq)
+		data, _ := db.Get(ro, []byte(word))
+		
+		// Converting byte stream to array of strings
+		strArray := []string{}
+		json.Unmarshal(data, &strArray)
+
+		// Appending current string to the array
+		updatedUri := uri + "," + strconv.Itoa(freq)
+		strArray = append(strArray, updatedUri)
+		fmt.Println("Appending URL to", word)
+
+		// Pushing the updated array in the database
+		strStream, _ := json.Marshal(strArray)
+		_ = db.Put(wo, []byte(word), strStream)
+	}
+
+	ro.Close()
+	wo.Close()
+	db.Close()
+
+}
+
+// Calculates frequency of every word in string
 func wordCount(str string) map[string]int {
     wordList := strings.Fields(str)
     counts := make(map[string]int)
