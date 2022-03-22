@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"encoding/json"
 	"github.com/jmhodges/levigo"
+	"sort"
 )
 
 func main() {
@@ -32,6 +33,14 @@ func main() {
 		strArray := []string{}
 		json.Unmarshal(data, &strArray)
 
+		sort.Slice(strArray, func(i1, i2 int) bool {
+			pair1 := strings.Split(strArray[i1], ",")
+			count1, _ := strconv.Atoi(pair1[1])
+			pair2 := strings.Split(strArray[i2], ",")
+			count2, _ := strconv.Atoi(pair2[1])
+			return count1 > count2
+		})
+
 		count := len(strArray)
 
 		fmt.Println("\nThe links are listed along with the frequency of the keyword in the corresponding URL.\n ")
@@ -49,7 +58,6 @@ func main() {
 		fmt.Println("\nDo you wish to enter another keyword? (yes/no)")
 		fmt.Scanln(&flag)
 	}
-
 
 	defer db.Close()
 }

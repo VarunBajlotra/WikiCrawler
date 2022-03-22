@@ -38,13 +38,13 @@ func main() {
 	go func() { queue <- args[0] }()
 	go filterQueue(queue, filteredQueue)
 
-	// Introduced a bool channel to synchronize execution of concurrently running crawlers
+	// Introduced a bool channel to synchronize execution of concurrently running 
 	done := make(chan bool)
 
 	count := 0
 
 	for i := 0; i < 1; i++ {
-		// Running an async Go function
+		// Running an async Goroutine
 		go func() {
 			for uri := range filteredQueue {
 				enqueue(uri, queue)
@@ -111,7 +111,7 @@ func storeData(uri, text string) {
 	opts := levigo.NewOptions()
 	opts.SetCache(levigo.NewLRUCache(3<<30))
 	opts.SetCreateIfMissing(true)
-	db, _ := levigo.Open("dictionary", opts)
+	db, _ := levigo.Open("dictionary2", opts)
 
 
 	// Reading from the db
@@ -166,3 +166,5 @@ func wordCount(str string) map[string]int {
     }
     return counts
 }
+
+// go run wiki_crawler.go https://en.wikipedia.org/wiki/Web_scraping
